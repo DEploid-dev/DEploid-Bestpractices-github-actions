@@ -1,0 +1,63 @@
+name: sigma 2.0 another 8
+
+on:
+  push:
+
+jobs:
+  each-sample:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        # sample: [PG0389-C, PG0390-C]
+        sample: [PG0389-C, PG0390-C, PG0391-C, PG0392-C, PG0393-C, PG0394-C, PG0395-C,
+                 PG0396-C, PG0397-C, PG0398-C, PG0399-C,
+                 PG0400-C, PG0401-C, PG0402-C, PG0403-C, PG0404-C, PG0405-C, PG0406-C,
+                 PG0407-C, PG0408-C, PG0409-C, PG0410-C,
+                 PG0411-C, PG0412-C, PG0413-C, PG0414-C, PG0415-C,
+                 cb_3D7_HB3_DD2_7G8_w1, cb_3D7_HB3_DD2_7G8_w2,
+                 cb_3D7_HB3_DD2_7G8_w3, cb_3D7_HB3_DD2_7G8_w4]
+        seed: [9, 10, 11, 12, 13, 14, 15, 16]
+
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@master
+
+    - name: run docker
+      run: |
+        docker pull shajoezhu/deploid
+        docker run shajoezhu/deploid
+        docker run -v ${PWD}:/tmp/ -w /tmp/ \
+        shajoezhu/deploid -best -bestPonly -vcf vcfs/${{ matrix.sample }}.vcf.gz \
+        -nSample 500 -rate 8 -burn 0.67 -sigma 2.0 -vqslod 8 \
+        -plaf plafs/labStrains.eg.PLAF.txt \
+        -panel panels/combined_pf3k_field_panel_withcross_withparent.txt \
+        -exclude excludes/exclude.txt \
+        -o ${{ matrix.sample }}-Best-${{ matrix.seed }} -seed ${{ matrix.seed }}
+        echo -n ${{ matrix.sample }} > ${{ matrix.sample }}-${{ matrix.seed }}-last_line.txt
+        echo -n -e "\t" >> ${{ matrix.sample }}-${{ matrix.seed }}-last_line.txt
+        echo -n ${{ matrix.seed }} >> ${{ matrix.sample }}-${{ matrix.seed }}-last_line.txt
+        echo -n -e "\t" >> ${{ matrix.sample }}-${{ matrix.seed }}-last_line.txt
+        tail -1 ${{ matrix.sample }}-Best-${{ matrix.seed }}.log >> ${{ matrix.sample }}-${{ matrix.seed }}-last_line.txt
+
+    - name: Upload result for each-sample (${{ matrix.sample }})
+      uses: actions/upload-artifact@v1
+      with:
+        name: each-sample
+        path: ${{ matrix.sample }}-${{ matrix.seed }}-last_line.txt
+
+  collect-result:
+    needs: each-sample
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download result from each sample
+        uses: actions/download-artifact@v1
+        with:
+          name: each-sample
+
+      - name: collecting
+        run: |
+          echo "lets collect"
+          cat each-sample/*-last_line.txt > gather.txt
+          cat gather.txt
